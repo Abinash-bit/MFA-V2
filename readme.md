@@ -2,8 +2,6 @@
 
 The model is trained on large databases of different languages and dilects of those in different regions of india, the model is trained on simple CPU , and the computational cost is lowest as compared to different SR models across the worlds, we aim to build the tool in all different languages all over the world so that there will be no linguistic barriers among us.
 
-This tool will create SRT files by taking a video file and its text file.
-We aim for the tool to support the following languages : English, Hindi, Tamil and Punjabi for now.
 
 ## Replicating the Development Environment
 
