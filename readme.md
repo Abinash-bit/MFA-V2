@@ -64,8 +64,7 @@ Inside the working directory
     git clone https://github.com/Abinash-bit/MFA-V2.git
 
 Now in appV2.py 
-- Change the desired folder path in the following line number
-- 19, 23, 55, 67, 68, 83, 84, 100, 101, 356, 357, 359, 361, 362, 364, 365, 366, 368 
+- Change the desired folder path
     
 
 
