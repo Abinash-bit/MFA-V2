@@ -45,6 +45,10 @@ def mp4_to_wav(mp4, wav):
     video = VideoFileClip(mp4)
     video.audio.write_audiofile(wav, codec='pcm_s16le')
 
+def mp3_to_wav(mp3, wav):
+    audio = AudioSegment.from_mp3(mp3)
+    audio.export(wav, format="wav")
+
 def txt_to_lab(txt, lab):
     with open(txt, 'r', encoding='utf-8') as txt_file, open(lab, 'w', encoding='utf-8') as lab_file:
         for line in txt_file:
@@ -100,7 +104,11 @@ def punjabi(path,textgrid):
                      "C:/Users/Administrator/Desktop/ASP-Project/pretrained_models_tanishka/dictionary/punjabi_cv.dict",
                      "C:/Users/Administrator/Desktop/ASP-Project/pretrained_models_tanishka/acoustic/new_acoustic_model.zip",
                      path, '--beam', '400']
-    sp.run(align_command, shell=True, check=True)
+    try:
+        sp.run(align_command, shell=True, check=True)
+    except sp.CalledProcessError:
+        st.error('The voice in the file does not match.')
+        return None  # Return None to indicate failure
     if not os.path.exists(textgrid):
         raise FileNotFoundError(f"{textgrid} not found after alignment process.")
     with open(textgrid, 'r', encoding='utf-8') as file:
@@ -261,6 +269,32 @@ def add_multiple_files_to_zip(files_to_add):
         for file in files_to_add:
             zip_ref.write(file)
 
+def remove_brackets_and_track_lines(txt_path):
+    with open(txt_path, 'r', encoding='utf-8') as file:
+        lines = file.readlines()
+    
+    new_lines = []
+    bracket_lines = []
+    for i, line in enumerate(lines):
+        if '[' in line and ']' in line:
+            bracket_lines.append(i + 1)
+            new_line = line.replace('[', '').replace(']', '')
+            new_lines.append(new_line)
+        else:
+            new_lines.append(line)
+    
+    with open(txt_path, 'w', encoding='utf-8') as file:
+        file.writelines(new_lines)
+    
+    return bracket_lines
+
+def add_brackets_to_srt(srt_path, bracket_lines):
+    subs = pysrt.open(srt_path, encoding='utf-8')
+    for line_number in bracket_lines:
+        if line_number - 1 < len(subs):
+            subs[line_number - 1].text = f"[{subs[line_number - 1].text}]"
+    subs.save(srt_path, encoding='utf-8')
+
 def alignment(mp4, txt, language, start=0, stop=0):
     st.write("<h7 class = 'stLang'>Performing Alignment...</h7>", unsafe_allow_html=True)
     progress_bar.progress(10)  # Update progress bar
@@ -272,7 +306,16 @@ def alignment(mp4, txt, language, start=0, stop=0):
 
     progress_bar.progress(20)  # Update progress bar
 
-    mp4_to_wav(mp4_path, wav_path)
+    if mp4_path.endswith('.mp4'):
+        mp4_to_wav(mp4_path, wav_path)
+    elif mp4_path.endswith('.mp3'):
+        mp3_to_wav(mp4_path, wav_path)
+    elif mp4_path.endswith('.wav'):
+        # If the file is already a WAV, just copy it to the destination
+        shutil.copyfile(mp4_path, wav_path)
+    else:
+        raise ValueError("Unsupported file format. Please upload an MP4, MP3, or WAV file.")
+
     progress_bar.progress(30)
 
     if start != 0 and stop != 0:
@@ -280,8 +323,14 @@ def alignment(mp4, txt, language, start=0, stop=0):
         trim_audio(wav_path, trimmed_wav, start, stop)
         progress_bar.progress(40)
 
+    bracket_lines = remove_brackets_and_track_lines(txt_path)
+    st.write(f"Lines with brackets removed: {bracket_lines}")
+
     txt_to_lab(txt_path, lab_path)
     progress_bar.progress(50)
+
+    # Initialize source_lang with a default value
+    source_lang = 'Latin'  # Default for English
 
     if language == 'English':
         textgrid_content = english(folder, textgrid_path)
@@ -314,12 +363,14 @@ def alignment(mp4, txt, language, start=0, stop=0):
     progress_bar.progress(90)
     adjust_srt_timestamps(finalsrt_path, alignedsrt_path, start)
 
+    add_brackets_to_srt(alignedsrt_path, bracket_lines)
+
     progress_bar.progress(100)
     st.write("<h7 class = 'stLang'>Alignment Successful!</h7>", unsafe_allow_html=True)
 
     transliterate_srt(alignedsrt_path, trans_srt_path, source_lang)
 
-    combine_srt_files(alignedsrt_path,trans_srt_path, combined_file)
+    combine_srt_files(alignedsrt_path, trans_srt_path, combined_file)
 
     files_to_add = [alignedsrt_path, trans_srt_path, combined_file]
     create_or_empty_zip(archived, files_to_add)
@@ -330,11 +381,18 @@ def alignment(mp4, txt, language, start=0, stop=0):
     st.session_state.combined_content = open(combined_file, 'r', encoding='utf-8').read()
     st.session_state.zip_content = open(archived, "rb").read()
 
+def cleanup_folders():
+    specific_folder = 'C:/Users/Administrator/Documents/MFA/forced_alignment'
+    if os.path.exists(specific_folder):
+        shutil.rmtree(specific_folder)
+    if os.path.exists(upload):
+        shutil.rmtree(upload)
+
 st.markdown('<h1 class="stTitle">Align and Generate Your Subtitles!</h1>', unsafe_allow_html=True)
 st.write('<h5 class="stLang">Select the Language of your video</h5>', unsafe_allow_html=True)
 lang = st.selectbox('', ['English', 'Tamil', 'Hindi', 'Punjabi'])
 st.write('<h5 class="stLang">Select your Video</h5>', unsafe_allow_html=True)
-mp4_file = st.file_uploader('', type=['mp4'])
+mp4_file = st.file_uploader('', type=['mp4', 'mp3', 'wav'])
 
 trim_option = st.checkbox('Do you want to trim the audio?')
 
@@ -388,3 +446,5 @@ if submit_button:
             st.text_area('Generated SRT File:', value=st.session_state.srt_content, height=400)
         except Exception as e:
             st.error(f"Error: {str(e)}")
+        finally:
+            cleanup_folders()
