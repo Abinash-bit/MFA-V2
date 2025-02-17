@@ -73,5 +73,7 @@ Now in appV2.py
     streamlit run appV2.py
 
 
-## Yeah You are ready with the development set up
+# Model Flow
+
+![Alt Text](images/MFA_Flow.jpg)
 
