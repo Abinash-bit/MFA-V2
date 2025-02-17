@@ -77,3 +77,6 @@ Now in appV2.py
 
 ![Alt Text](images/MFA_Flow.jpg)
 
+# App Flow
+![Alt Text](images/App_flow_c4gt.jpg)
+
